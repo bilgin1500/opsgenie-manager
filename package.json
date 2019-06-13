@@ -1,0 +1,19 @@
+{
+  "name": "opsgenie-manager",
+  "version": "1.0.0",
+  "description": "Programmatically manage an OpsGenie instance using the node.js SDK ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "opsgenie",
+    "admin",
+    "node"
+  ],
+  "author": "Bilgin Özkan <bozkan@atlassian.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "opsgenie-sdk": "^0.4.3"
+  }
+}
