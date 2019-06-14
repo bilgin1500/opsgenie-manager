@@ -1,4 +1,4 @@
-var faker = require('faker');
+var faker = require("faker");
 
 const alert = () => {
   return {
@@ -7,7 +7,9 @@ const alert = () => {
     description: faker.lorem.paragraph(),
     visibleTo: [
       {
-        name: `team-${faker.helpers.slugify(faker.random.word()).toLowerCase()}`,
+        name: `team-${faker.helpers
+          .slugify(faker.random.word())
+          .toLowerCase()}`,
         type: "team"
       },
       {
@@ -26,6 +28,14 @@ const alert = () => {
   };
 };
 
+const team = () => {
+  return {
+    name: faker.random.word(),
+    description: faker.lorem.sentence()
+  };
+};
+
 module.exports = {
-  alert
-}
+  alert,
+  team
+};

@@ -1,32 +1,33 @@
 const fetch = require("node-fetch");
-const argv = require("yargs").argv;
+const argv = require("yargs");
 const mocks = require("./mocks");
 
 /**
  * TODO
- * - Finalize argv API:
+ * - Finalize the `argv` API:
  *  - node opsgenie create 12 alerts
  *  - node opsgenie delete all teams
  *  - node opsgenie get alert 23
  *  - node opsgenie list alerts --apikey 6e2e1a46-494e-4919-a111-3da01dea68f2 --host https://bozkan-api.opsgeni.us/
+ * - Update the `console.log` statements properly.
  */
 
-// Base config
-const baseApiUrl = "https://bozkan-api.opsgeni.us/";
-const apiKey = "6e2e1a46-494e-4919-a111-3da01dea68f2";
+// Parsed arguments
+const args = argv
+  .usage("Usage: $0 -apikey [key] -host [url]")
+  .demandOption(["apikey", "host"]).argv;
+
+// const endpointNode = args._[2];
+// const endpointAction = args._[0];
+// const quantity = args._[1];
 
 // API endpoints
 const alertsUrl = "/v2/alerts";
-const alertsUrl = "/v2/alerts";
-
-/* console.log(argv);
-const endpointNode = argv._[2];
-const endpointAction = argv._[0];
-const quantity = argv._[1]; */
+const teamsUrl = "/v2/teams";
 
 /**
  * The core fetch object
- * @param {object} opts - Options parameter, accepts url, method, apiKey and data
+ * @param {object} opts - Options parameter, accepts url, method and data
  */
 const request = opts =>
   fetch(opts.url, {
@@ -34,7 +35,7 @@ const request = opts =>
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: `GenieKey ${opts.apiKey}`
+      Authorization: `GenieKey ${args.apikey}`
     },
     body: opts.data ? JSON.stringify(opts.data) : null
   })
@@ -58,10 +59,10 @@ const bulk = async (quantity, action) => {
   for (let i = 0; i < quantity; i++) {
     const curr = i + 1; // bypass 0
     await action.call(undefined, curr);
-    console.log("Created/deleted/updated xx", curr);
+    console.log(`Bulk action ${curr} done.`);
   }
 
-  console.log(`${quantity} xx have been xx.`);
+  console.log(`Total ${quantity} bulk actions done.`);
 };
 
 /**
@@ -69,17 +70,31 @@ const bulk = async (quantity, action) => {
  */
 const opsgenie = {
   alerts: {
-    list: () => request({ url: `${baseApiUrl}${alertsUrl}`, apiKey }),
+    list: () => request({ url: `${args.host}${alertsUrl}` }),
     create: () =>
       request({
-        apiKey,
-        url: `${baseApiUrl}${alertsUrl}`,
+        url: `${args.host}${alertsUrl}`,
         method: "POST",
         data: mocks.alert()
+      })
+  },
+  teams: {
+    list: () => request({ url: `${args.host}${teamsUrl}` }),
+    create: () =>
+      request({
+        url: `${args.host}${teamsUrl}`,
+        method: "POST",
+        data: mocks.team()
       })
   }
 };
 
+/**
+ * Examples while argv API is still in progress, uncomment to use them:
+ */
 // opsgenie.alerts.list().then(response => console.log(response));
-bulk(12, opsgenie.alerts.create);
+// opsgenie.teams.list().then(response => console.log(response));
+// opsgenie.teams.create().then(response => console.log(response));
+// bulk(30, opsgenie.alerts.create);
+// bulk(40, opsgenie.teams.create);
 // console.log(mocks.alert());
