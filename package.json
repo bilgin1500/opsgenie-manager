@@ -13,7 +13,9 @@
   ],
   "author": "Bilgin Özkan <bozkan@atlassian.com>",
   "license": "ISC",
-  "devDependencies": {
-    "opsgenie-sdk": "^0.4.3"
+  "dependencies": {
+    "faker": "^4.1.0",
+    "node-fetch": "^2.6.0",
+    "yargs": "^13.2.4"
   }
 }
