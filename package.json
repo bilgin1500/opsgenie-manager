@@ -1,7 +1,7 @@
 {
   "name": "opsgenie-manager",
   "version": "1.0.0",
-  "description": "Programmatically manage an OpsGenie instance using the node.js SDK ",
+  "description": "Programmatically manage an OpsGenie instance using Rest API V2",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,7 +11,7 @@
     "admin",
     "node"
   ],
-  "author": "Bilgin Özkan <bozkan@atlassian.com>",
+  "author": "Bilgin Özkan <bilgin1500@gmail.com>",
   "license": "ISC",
   "dependencies": {
     "faker": "^4.1.0",
