@@ -8,7 +8,7 @@ const mocks = require("./mocks");
  *  - node opsgenie create 12 alerts
  *  - node opsgenie delete all teams
  *  - node opsgenie get alert 23
- *  - node opsgenie list alerts --apikey 6e2e1a46-494e-4919-a111-3da01dea68f2 --host https://bozkan-api.opsgeni.us/
+ *  - node opsgenie list alerts --apikey xxxx-xxxx-xxxx-xxxx --host https://api.opsgenie.com/
  * - Update the `console.log` statements properly.
  */
 
