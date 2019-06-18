@@ -1,6 +1,7 @@
 const fetch = require("node-fetch");
 const argv = require("yargs");
-const mocks = require("./mocks");
+const faker = require("faker");
+// const mocks = require("./mocks");
 
 /**
  * TODO
@@ -24,9 +25,10 @@ const args = argv
 // API endpoints
 const alertsUrl = "/v2/alerts";
 const teamsUrl = "/v2/teams";
+const servicesUrl = "/v1/services";
 
 /**
- * The core fetch object
+ * Fetch wrapper
  * @param {object} opts - Options parameter, accepts url, method and data
  */
 const request = opts =>
@@ -66,6 +68,61 @@ const bulk = async (quantity, action) => {
 };
 
 /**
+ * https://docs.opsgenie.com/docs/alert-api
+ */
+const mockAlert = () => {
+  return {
+    message: faker.lorem.sentence(),
+    alias: faker.lorem.sentence(),
+    description: faker.lorem.paragraph(),
+    visibleTo: [
+      {
+        name: `team-${faker.helpers
+          .slugify(faker.random.word())
+          .toLowerCase()}`,
+        type: "team"
+      },
+      {
+        username: faker.internet.email(),
+        type: "user"
+      }
+    ],
+    actions: [faker.hacker.verb(), faker.hacker.verb()],
+    tags: [faker.random.word(), faker.random.word()],
+    details: {
+      key1: faker.random.word(),
+      key2: faker.random.word()
+    },
+    entity: faker.random.words(),
+    priority: "P1"
+  };
+};
+
+/**
+ * https://docs.opsgenie.com/docs/team-api
+ */
+const mockTeam = () => {
+  return {
+    name: faker.random.word(),
+    description: faker.lorem.sentence()
+  };
+};
+
+/**
+ * https://docs.opsgenie.com/docs/service-api
+ */
+const mockService = async () => {
+  const teamList = await opsgenie.teams.list();
+  const randomTeamId = teamList.data[Math.floor(Math.random() * teamList.data.length)].id
+
+  return {
+    name: faker.random.words(),
+    teamId: randomTeamId,
+    description: faker.lorem.sentence()
+  };
+};
+
+/**
  * The final API to expose
  */
 const opsgenie = {
@@ -75,7 +132,7 @@ const opsgenie = {
       request({
         url: `${args.host}${alertsUrl}`,
         method: "POST",
-        data: mocks.alert()
+        data: mockAlert()
       })
   },
   teams: {
@@ -84,8 +141,21 @@ const opsgenie = {
       request({
         url: `${args.host}${teamsUrl}`,
         method: "POST",
-        data: mocks.team()
+        data: mockTeam()
       })
+  },
+  services: {
+    list: () => request({ url: `${args.host}${servicesUrl}` }),
+    create: async () => {
+      const mockData = await mockService();
+
+      return request({
+        url: `${args.host}${servicesUrl}`,
+        method: "POST",
+        data: mockData
+      })
+    }
+
   }
 };
 
@@ -94,7 +164,9 @@ const opsgenie = {
  */
 // opsgenie.alerts.list().then(response => console.log(response));
 // opsgenie.teams.list().then(response => console.log(response));
+// opsgenie.services.list().then(response => console.log(response));
 // opsgenie.teams.create().then(response => console.log(response));
+// opsgenie.services.create().then(response => console.log(response));
 // bulk(30, opsgenie.alerts.create);
 // bulk(40, opsgenie.teams.create);
-// console.log(mocks.alert());
+// bulk(40, opsgenie.services.create);
