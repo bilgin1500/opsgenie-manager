@@ -49,7 +49,10 @@ const request = opts =>
       return response;
     })
     .then(response => response.json())
-    .catch(error => console.error(error));
+    .catch(error => {
+      console.error(error);
+      console.log('\nFor detailed information about response codes please refer to https://docs.opsgenie.com/docs/response#section-response-codes\n');
+    });
 
 /**
  * Async bulk action executor
@@ -162,11 +165,15 @@ const opsgenie = {
 /**
  * Examples while argv API is still in progress, uncomment to use them:
  */
+//
 // opsgenie.alerts.list().then(response => console.log(response));
 // opsgenie.teams.list().then(response => console.log(response));
 // opsgenie.services.list().then(response => console.log(response));
+//
+// opsgenie.alerts.create().then(response => console.log(response));
 // opsgenie.teams.create().then(response => console.log(response));
 // opsgenie.services.create().then(response => console.log(response));
-// bulk(30, opsgenie.alerts.create);
+//
+// bulk(40, opsgenie.alerts.create);
 // bulk(40, opsgenie.teams.create);
 // bulk(40, opsgenie.services.create);
