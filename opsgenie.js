@@ -27,6 +27,14 @@ const alertsUrl = "/v2/alerts";
 const teamsUrl = "/v2/teams";
 const servicesUrl = "/v1/services";
 
+// API pagination defaults
+const paginationDefaults = {
+  offset: 0,
+  limit: 25,
+  sort: "createdAt",
+  order: "desc"
+};
+
 /**
  * Fetch wrapper
  * @param {object} opts - Options parameter, accepts url, method and data
@@ -51,8 +59,39 @@ const request = opts =>
     .then(response => response.json())
     .catch(error => {
       console.error(error);
-      console.log('\nFor detailed information about response codes please refer to https://docs.opsgenie.com/docs/response#section-response-codes\n');
+      console.log(
+        "\nFor detailed information about response codes please refer to https://docs.opsgenie.com/docs/response#section-response-codes\n"
+      );
     });
+
+/**
+ * This function collects all the paginated data and returns the merged collection
+ * @param {function} apiCall - The API call to run during the loop
+ */
+const collect = async apiCall => {
+  let allData = [];
+  let currPage = 0;
+
+  while (currPage >= 0) {
+    let newOffsetParams = {
+      ...paginationDefaults,
+      ...{ offset: paginationDefaults.limit * currPage }
+    };
+    const response = await apiCall(newOffsetParams);
+
+    if (response.data) {
+      allData = [...allData, ...response.data];
+
+      if (response.paging && response.paging.next) {
+        currPage++;
+      } else {
+        currPage = -1;
+      }
+    }
+  }
+
+  return allData;
+};
 
 /**
  * Async bulk action executor
@@ -116,7 +155,8 @@ const mockTeam = () => {
  */
 const mockService = async () => {
   const teamList = await opsgenie.teams.list();
-  const randomTeamId = teamList.data[Math.floor(Math.random() * teamList.data.length)].id
+  const randomTeamId =
+    teamList.data[Math.floor(Math.random() * teamList.data.length)].id;
 
   return {
     name: faker.random.words(),
@@ -130,13 +170,33 @@ const mockService = async () => {
  */
 const opsgenie = {
   alerts: {
-    list: () => request({ url: `${args.host}${alertsUrl}` }),
+    list: params => {
+      const paginationParams = new URLSearchParams(
+        Object.entries(params || paginationDefaults)
+      );
+      return request({ url: `${args.host}${alertsUrl}?${paginationParams}` });
+    },
     create: () =>
       request({
         url: `${args.host}${alertsUrl}`,
         method: "POST",
         data: mockAlert()
-      })
+      }),
+    getAll: () => collect(opsgenie.alerts.list),
+    deleteAll: async () => {
+      const allAlerts = await opsgenie.alerts.getAll();
+      const allAlertIds = allAlerts.reduce((acc, curr) => {
+        return [...acc, curr.id];
+      }, []);
+
+      for (const alertId of allAlertIds) {
+        const response = await request({
+          url: `${args.host}${alertsUrl}/${alertId}`,
+          method: "DELETE"
+        });
+        console.log(response);
+      }
+    }
   },
   teams: {
     list: () => request({ url: `${args.host}${teamsUrl}` }),
@@ -156,24 +216,29 @@ const opsgenie = {
         url: `${args.host}${servicesUrl}`,
         method: "POST",
         data: mockData
-      })
+      });
     }
-
   }
 };
 
 /**
  * Examples while argv API is still in progress, uncomment to use them:
  */
-//
-// opsgenie.alerts.list().then(response => console.log(response));
-// opsgenie.teams.list().then(response => console.log(response));
-// opsgenie.services.list().then(response => console.log(response));
-//
-// opsgenie.alerts.create().then(response => console.log(response));
-// opsgenie.teams.create().then(response => console.log(response));
-// opsgenie.services.create().then(response => console.log(response));
-//
-// bulk(40, opsgenie.alerts.create);
-// bulk(40, opsgenie.teams.create);
-// bulk(40, opsgenie.services.create);
+
+/*
+  opsgenie.alerts.list().then(response => console.log(response));
+  opsgenie.teams.list().then(response => console.log(response));
+  opsgenie.services.list().then(response => console.log(response));
+
+  opsgenie.alerts.getAll().then(response => console.log(response));
+
+  opsgenie.alerts.deleteAll();
+
+  opsgenie.alerts.create().then(response => console.log(response));
+  opsgenie.teams.create().then(response => console.log(response));
+  opsgenie.services.create().then(response => console.log(response));
+
+  bulk(26, opsgenie.alerts.create);
+  bulk(40, opsgenie.teams.create);
+  bulk(40, opsgenie.services.create);
+*/
