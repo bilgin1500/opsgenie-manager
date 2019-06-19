@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const argv = require("yargs");
 const faker = require("faker");
-// const mocks = require("./mocks");
+const cliProgress = require('cli-progress');
 
 /**
  * TODO
@@ -35,6 +35,9 @@ const paginationDefaults = {
   order: "desc"
 };
 
+// Progress bar instance
+const progressBar = new cliProgress.Bar({}, cliProgress.Presets.shades_classic);
+
 /**
  * Fetch wrapper
  * @param {object} opts - Options parameter, accepts url, method and data
@@ -66,6 +69,7 @@ const request = opts =>
 
 /**
  * This function collects all the paginated data and returns the merged collection
+ *
  * @param {function} apiCall - The API call to run during the loop
  */
 const collect = async apiCall => {
@@ -94,19 +98,22 @@ const collect = async apiCall => {
 };
 
 /**
- * Async bulk action executor
+ * Async bulk API action executor. Helps you to call an endpoint {quantity} times.
+ *
  * @param {number} quantity - how many times to repeat the action
- * @param {function} action - A function to execute asynchronously,
- * the current index number will be supplied
+ * @param {function} apiCall - A API call to execute asynchronously,
+ * the current index number will be supplied as an argument.
  */
-const bulk = async (quantity, action) => {
+const bulk = async (quantity, apiCall) => {
+  progressBar.start(quantity, 0);
+
   for (let i = 0; i < quantity; i++) {
     const curr = i + 1; // bypass 0
-    await action.call(undefined, curr);
-    console.log(`Bulk action ${curr} done.`);
+    await apiCall.call(undefined, curr);
+    progressBar.update(curr);
   }
 
-  console.log(`Total ${quantity} bulk actions done.`);
+  progressBar.stop();
 };
 
 /**

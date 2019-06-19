@@ -14,6 +14,7 @@
   "author": "Bilgin Özkan <bilgin1500@gmail.com>",
   "license": "ISC",
   "dependencies": {
+    "cli-progress": "^2.1.1",
     "faker": "^4.1.0",
     "node-fetch": "^2.6.0",
     "yargs": "^13.2.4"
