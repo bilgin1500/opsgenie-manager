@@ -191,18 +191,24 @@ const opsgenie = {
       }),
     getAll: () => collect(opsgenie.alerts.list),
     deleteAll: async () => {
+      let curr = 0;
       const allAlerts = await opsgenie.alerts.getAll();
       const allAlertIds = allAlerts.reduce((acc, curr) => {
         return [...acc, curr.id];
       }, []);
 
+      progressBar.start(allAlertIds.length, 0);
+
       for (const alertId of allAlertIds) {
+        curr++;
         const response = await request({
           url: `${args.host}${alertsUrl}/${alertId}`,
           method: "DELETE"
         });
-        console.log(response);
+        progressBar.update(curr);
       }
+
+      progressBar.stop();
     }
   },
   teams: {
