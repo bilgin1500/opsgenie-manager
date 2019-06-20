@@ -16,7 +16,9 @@
   "dependencies": {
     "cli-progress": "^2.1.1",
     "faker": "^4.1.0",
-    "node-fetch": "^2.6.0",
+    "inquirer": "^6.4.0",
+    "request": "^2.88.0",
+    "requestretry": "^4.0.0",
     "yargs": "^13.2.4"
   }
 }

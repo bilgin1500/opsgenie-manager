@@ -1,16 +1,14 @@
-const fetch = require("node-fetch");
 const argv = require("yargs");
 const faker = require("faker");
-const cliProgress = require('cli-progress');
+const request = require("requestretry");
+const cliProgress = require("cli-progress");
+const inquirer = require("inquirer");
 
 /**
  * TODO
- * - Finalize the `argv` API:
- *  - node opsgenie create 12 alerts
- *  - node opsgenie delete all teams
- *  - node opsgenie get alert 23
- *  - node opsgenie list alerts --apikey xxxx-xxxx-xxxx-xxxx --host https://api.opsgenie.com/
- * - Update the `console.log` statements properly.
+ * - Bulk should be thenable.
+ * - Manage the errors properly. (To test, close the services and make the requests, you'll get 503)
+ * - Finalize the API. Maybe http://tj.github.io/commander.js can be useful.
  */
 
 // Parsed arguments
@@ -26,6 +24,7 @@ const args = argv
 const alertsUrl = "/v2/alerts";
 const teamsUrl = "/v2/teams";
 const servicesUrl = "/v1/services";
+const integrationsUrl = "/v2/integrations";
 
 // API pagination defaults
 const paginationDefaults = {
@@ -38,34 +37,43 @@ const paginationDefaults = {
 // Progress bar instance
 const progressBar = new cliProgress.Bar({}, cliProgress.Presets.shades_classic);
 
+// Base config for retry strategy
+const retryConfig = {
+  maxAttempts: 5,
+  retryDelay: 5000,
+  retryStrategy: request.RetryStrategies.HTTPOrNetworkError
+};
+
 /**
- * Fetch wrapper
+ * Request wrapper
  * @param {object} opts - Options parameter, accepts url, method and data
  */
-const request = opts =>
-  fetch(opts.url, {
-    method: opts.method || "GET",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `GenieKey ${args.apikey}`
-    },
-    body: opts.data ? JSON.stringify(opts.data) : null
-  })
-    .then(response => {
-      if (!response.ok || (response.status < 200 || response.status >= 300)) {
-        throw Error(response.statusText);
-      }
-
-      return response;
-    })
-    .then(response => response.json())
-    .catch(error => {
-      console.error(error);
-      console.log(
-        "\nFor detailed information about response codes please refer to https://docs.opsgenie.com/docs/response#section-response-codes\n"
-      );
+const fetch = async opts => {
+  try {
+    const response = await request({
+      ...{
+        url: args.host,
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `GenieKey ${args.apikey}`
+        },
+        json: true,
+        fullResponse: false
+      },
+      ...opts,
+      ...retryConfig
     });
+    return response;
+  } catch (error) {
+    console.log(
+      `🔴 ${response.status} - ${
+        response.statusText
+      } \nℹ️ For detailed information about response codes please refer to https://docs.opsgenie.com/docs/response#section-response-codes\n`
+    );
+  }
+};
 
 /**
  * This function collects all the paginated data and returns the merged collection
@@ -105,15 +113,21 @@ const collect = async apiCall => {
  * the current index number will be supplied as an argument.
  */
 const bulk = async (quantity, apiCall) => {
-  progressBar.start(quantity, 0);
+  try {
+    progressBar.start(quantity, 0);
 
-  for (let i = 0; i < quantity; i++) {
-    const curr = i + 1; // bypass 0
-    await apiCall.call(undefined, curr);
-    progressBar.update(curr);
+    for (let i = 0; i <= quantity; i++) {
+      await apiCall.call(undefined, i);
+      progressBar.update(i);
+    }
+
+    progressBar.stop();
+
+    console.log(`\n✅ x ${quantity} times. Successfully finished the actions.`);
+  } catch (error) {
+    console.log("\n❌ Sorry, something bad happened. Couldn't finish the job.");
+    console.error(error);
   }
-
-  progressBar.stop();
 };
 
 /**
@@ -173,63 +187,124 @@ const mockService = async () => {
 };
 
 /**
+ * https://docs.opsgenie.com/docs/integration-api#section-create-a-new-integration-action
+ */
+const mockIntegrationAction = () => {
+  const types = ["create", "close", "acknowledge", "addNote"];
+
+  return {
+    type: types[Math.floor(Math.random() * types.length)],
+    name: faker.random.words(),
+    order: 1,
+    filter: {
+      conditionMatchType: "Match Any Condition",
+      conditions: [
+        {
+          field: "tags",
+          isNot: false,
+          operation: "Is Empty",
+          expectedValue: ""
+        }
+      ]
+    },
+    source: faker.random.word(),
+    message: faker.lorem.sentence(),
+    description: faker.lorem.paragraph(),
+    appendAttachments: true,
+    alertActions: [],
+    ignoreAlertActionsFromPayload: false,
+    recipients: [],
+    ignoreRecipientsFromPayload: false,
+    ignoreTeamsFromPayload: false,
+    tags: [],
+    ignoreTagsFromPayload: false,
+    extraProperties: {},
+    ignoreExtraPropertiesFromPayload: false
+  };
+};
+
+/**
  * The final API to expose
  */
 const opsgenie = {
   alerts: {
-    list: params => {
-      const paginationParams = new URLSearchParams(
-        Object.entries(params || paginationDefaults)
-      );
-      return request({ url: `${args.host}${alertsUrl}?${paginationParams}` });
-    },
+    list: params =>
+      fetch({
+        url: `${args.host}${alertsUrl}`,
+        qs: params || paginationDefaults
+      }),
     create: () =>
-      request({
+      fetch({
         url: `${args.host}${alertsUrl}`,
         method: "POST",
-        data: mockAlert()
+        body: mockAlert()
       }),
     getAll: () => collect(opsgenie.alerts.list),
     deleteAll: async () => {
-      let curr = 0;
       const allAlerts = await opsgenie.alerts.getAll();
       const allAlertIds = allAlerts.reduce((acc, curr) => {
         return [...acc, curr.id];
       }, []);
 
-      progressBar.start(allAlertIds.length, 0);
-
-      for (const alertId of allAlertIds) {
-        curr++;
-        const response = await request({
-          url: `${args.host}${alertsUrl}/${alertId}`,
+      bulk(allAlertIds.length, i =>
+        fetch({
+          url: `${args.host}${alertsUrl}/${allAlertIds[i]}`,
           method: "DELETE"
-        });
-        progressBar.update(curr);
-      }
-
-      progressBar.stop();
+        })
+      );
     }
   },
   teams: {
-    list: () => request({ url: `${args.host}${teamsUrl}` }),
+    list: () => fetch({ url: `${args.host}${teamsUrl}` }),
     create: () =>
-      request({
+      fetch({
         url: `${args.host}${teamsUrl}`,
         method: "POST",
-        data: mockTeam()
+        body: mockTeam()
       })
   },
   services: {
-    list: () => request({ url: `${args.host}${servicesUrl}` }),
+    list: () => fetch({ url: `${args.host}${servicesUrl}` }),
     create: async () => {
       const mockData = await mockService();
 
-      return request({
+      return fetch({
         url: `${args.host}${servicesUrl}`,
         method: "POST",
-        data: mockData
+        body: mockData
       });
+    }
+  },
+  integrations: {
+    list: () => fetch({ url: `${args.host}${integrationsUrl}` }),
+    createActions: async quantity => {
+      const integrationsList = await opsgenie.integrations.list();
+
+      if (integrationsList.data) {
+        inquirer
+          .prompt([
+            {
+              type: "list",
+              message: "Please select an integration to add the actions",
+              name: "selectedIntegration",
+              choices: () =>
+                integrationsList.data.reduce((acc, curr) => {
+                  return [...acc, { name: curr.name, value: curr.id }];
+                }, [])
+            }
+          ])
+          .then(answers =>
+            bulk(quantity, () =>
+              fetch({
+                url: `${args.host}${integrationsUrl}/${
+                  answers.selectedIntegration
+                }/actions`,
+                method: "POST",
+                body: mockIntegrationAction()
+              })
+            )
+          ).finally(process.exit)
+      }
     }
   }
 };
@@ -242,6 +317,7 @@ const opsgenie = {
   opsgenie.alerts.list().then(response => console.log(response));
   opsgenie.teams.list().then(response => console.log(response));
   opsgenie.services.list().then(response => console.log(response));
+  opsgenie.integrations.list().then(response => console.log(response));
 
   opsgenie.alerts.getAll().then(response => console.log(response));
 
@@ -250,6 +326,7 @@ const opsgenie = {
   opsgenie.alerts.create().then(response => console.log(response));
   opsgenie.teams.create().then(response => console.log(response));
   opsgenie.services.create().then(response => console.log(response));
+  opsgenie.integrations.createActions(100);
 
   bulk(26, opsgenie.alerts.create);
   bulk(40, opsgenie.teams.create);
